@@ -54,6 +54,16 @@ def get_base_version(project_dir):
     return config.get('crosspoint', 'version')
 
 
+def get_git_short_sha(project_dir):
+    try:
+        return subprocess.check_output(
+            ['git', 'rev-parse', '--short', 'HEAD'],
+            text=True, stderr=subprocess.PIPE, cwd=project_dir
+        ).strip()
+    except Exception:
+        return None
+
+
 def inject_version(env):
     # Only applies to the dev (default) environment; release envs set the
     # version via build_flags in platformio.ini and are unaffected.
@@ -62,8 +72,15 @@ def inject_version(env):
 
     project_dir = env['PROJECT_DIR']
     base_version = get_base_version(project_dir)
-    branch = get_git_branch(project_dir)
-    version_string = f'{base_version}-dev+{branch}'
+
+    # CI builds: use CROSSPOINT_BUILD_SHA env var for reproducible version
+    ci_sha = os.environ.get('CROSSPOINT_BUILD_SHA')
+    if ci_sha:
+        version_string = f'{base_version}-{ci_sha[:7]}'
+    else:
+        branch = get_git_branch(project_dir)
+        sha = get_git_short_sha(project_dir) or 'unknown'
+        version_string = f'{base_version}-dev+{branch}+{sha}'
 
     env.Append(CPPDEFINES=[('CROSSPOINT_VERSION', f'\\"{version_string}\\"')])
     print(f'CrossPoint build version: {version_string}')
