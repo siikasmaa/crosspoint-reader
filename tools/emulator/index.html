@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CrossPoint Reader Emulator</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <header id="toolbar">
+      <h1>CrossPoint Reader Emulator</h1>
+      <div id="toolbar-controls">
+        <label id="upload-label" for="epub-upload">Open EPUB</label>
+        <input type="file" id="epub-upload" accept=".epub" />
+        <button id="settings-toggle" title="Settings">Settings</button>
+      </div>
+    </header>
+
+    <div id="main-area">
+      <aside id="settings-panel" class="hidden">
+        <h2>Display Settings</h2>
+
+        <div class="setting-group">
+          <label for="setting-orientation">Orientation</label>
+          <select id="setting-orientation">
+            <option value="landscape">Landscape (800x480)</option>
+            <option value="portrait">Portrait (480x800)</option>
+          </select>
+        </div>
+
+        <div class="setting-group">
+          <label for="setting-font">Font Family</label>
+          <select id="setting-font">
+            <option value="Georgia, 'Bookerly', serif">Bookerly / Georgia</option>
+            <option value="'Noto Sans', 'Helvetica Neue', sans-serif">Noto Sans</option>
+            <option value="'OpenDyslexic', 'Comic Sans MS', sans-serif">OpenDyslexic</option>
+          </select>
+        </div>
+
+        <div class="setting-group">
+          <label for="setting-fontsize">Font Size: <span id="fontsize-val">16</span>px</label>
+          <input type="range" id="setting-fontsize" min="12" max="24" value="16" step="1" />
+        </div>
+
+        <div class="setting-group">
+          <label for="setting-lineheight">Line Height: <span id="lineheight-val">1.5</span></label>
+          <input type="range" id="setting-lineheight" min="1.2" max="2.0" value="1.5" step="0.1" />
+        </div>
+
+        <div class="setting-group">
+          <label for="setting-margin">Margin: <span id="margin-val">20</span>px</label>
+          <input type="range" id="setting-margin" min="5" max="40" value="20" step="1" />
+        </div>
+
+        <div class="setting-group">
+          <label for="setting-align">Text Alignment</label>
+          <select id="setting-align">
+            <option value="justify">Justified</option>
+            <option value="left">Left</option>
+            <option value="center">Center</option>
+            <option value="right">Right</option>
+          </select>
+        </div>
+
+        <div class="setting-group">
+          <label>
+            <input type="checkbox" id="setting-grayscale" checked />
+            Grayscale filter (images)
+          </label>
+        </div>
+
+        <div class="setting-group">
+          <label>
+            <input type="checkbox" id="setting-dithering" />
+            Floyd-Steinberg dithering (images)
+          </label>
+        </div>
+      </aside>
+
+      <div id="display-area">
+        <div id="device-bezel">
+          <canvas id="eink-canvas" width="800" height="480"></canvas>
+        </div>
+
+        <div id="nav-controls">
+          <button id="btn-prev" title="Previous page">&lt; Prev</button>
+          <div id="page-info">
+            <select id="chapter-select" disabled>
+              <option>No book loaded</option>
+            </select>
+            <span id="page-status">Page 0 / 0</span>
+          </div>
+          <button id="btn-next" title="Next page">Next &gt;</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="drop-overlay" class="hidden">
+      <div id="drop-message">Drop EPUB file here</div>
+    </div>
+  </div>
+
+  <script src="emulator.js"></script>
+</body>
+</html>

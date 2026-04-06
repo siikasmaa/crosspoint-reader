@@ -1,0 +1,12 @@
+name = "crosspoint-ota"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+
+# R2 bucket binding for firmware storage
+[[r2_buckets]]
+binding = "FIRMWARE_BUCKET"
+bucket_name = "crosspoint-firmware"
+
+[vars]
+# Override these or use `wrangler secret put` for sensitive values
+FIRMWARE_VERSION = "1.2.0"
