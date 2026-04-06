@@ -102,6 +102,53 @@ jobs:
           path: .pio/build/default/firmware.bin
           if-no-files-found: error
 
+  deploy-ota:
+    needs: [build]
+    if: github.ref == 'refs/heads/customisation' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install wrangler
+        working-directory: tools/ota-worker
+        run: npm ci
+
+      - name: Download firmware artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: firmware.bin
+          path: /tmp/firmware
+
+      - name: Upload to R2 and deploy
+        working-directory: tools/ota-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          VERSION="1.2.0-${GITHUB_SHA::7}"
+          SIZE=$(stat -c%s /tmp/firmware/firmware.bin)
+
+          npx wrangler r2 object put "crosspoint-firmware/firmware.bin" \
+            --file="/tmp/firmware/firmware.bin" \
+            --content-type="application/octet-stream" \
+            --remote
+
+          echo "{\"version\": \"$VERSION\", \"size\": $SIZE}" > /tmp/version.json
+          npx wrangler r2 object put "crosspoint-firmware/version.json" \
+            --file="/tmp/version.json" \
+            --content-type="application/json" \
+            --remote
+
+          npx wrangler deploy
+
+          echo "## OTA Deploy" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Version: \`$VERSION\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Size: $SIZE bytes" >> "$GITHUB_STEP_SUMMARY"
+
   # This job is used as the PR required actions check, allows for changes to other steps in the future without breaking
   # PR requirements.
   test-status:
