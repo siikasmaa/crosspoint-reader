@@ -4,7 +4,6 @@
 #include <Logging.h>
 
 #include "CrossPointSettings.h"
-
 #include "esp_http_client.h"
 #include "esp_https_ota.h"
 #include "esp_wifi.h"
@@ -68,8 +67,7 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
   JsonDocument doc;
 
   // Use custom URL if set, otherwise fall back to default GitHub URL
-  const char* updateUrl =
-      (strlen(SETTINGS.otaServerUrl) > 0) ? SETTINGS.otaServerUrl : latestReleaseUrl;
+  const char* updateUrl = (strlen(SETTINGS.otaServerUrl) > 0) ? SETTINGS.otaServerUrl : latestReleaseUrl;
 
   esp_http_client_config_t client_config = {
       .url = updateUrl,

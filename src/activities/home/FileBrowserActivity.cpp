@@ -121,16 +121,14 @@ void FileBrowserActivity::loadFileThumbnails(int thumbHeight) {
     std::string thumbPath;
 
     if (FsHelpers::hasEpubExtension(entry)) {
-      std::string cachePath =
-          "/.crosspoint/epub_" + std::to_string(std::hash<std::string>{}(fullPath)) + "/thumb_" +
-          std::to_string(thumbHeight) + ".bmp";
+      std::string cachePath = "/.crosspoint/epub_" + std::to_string(std::hash<std::string>{}(fullPath)) + "/thumb_" +
+                              std::to_string(thumbHeight) + ".bmp";
       if (Storage.exists(cachePath.c_str())) {
         thumbPath = cachePath;
       }
     } else if (FsHelpers::hasXtcExtension(entry)) {
-      std::string cachePath =
-          "/.crosspoint/xtc_" + std::to_string(std::hash<std::string>{}(fullPath)) + "/thumb_" +
-          std::to_string(thumbHeight) + ".bmp";
+      std::string cachePath = "/.crosspoint/xtc_" + std::to_string(std::hash<std::string>{}(fullPath)) + "/thumb_" +
+                              std::to_string(thumbHeight) + ".bmp";
       if (Storage.exists(cachePath.c_str())) {
         thumbPath = cachePath;
       }
