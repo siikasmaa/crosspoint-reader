@@ -28,6 +28,7 @@ void OtaUpdateActivity::onWifiSelectionComplete(const bool success) {
   const auto res = updater.checkForUpdate();
   if (res != OtaUpdater::OK) {
     LOG_DBG("OTA", "Update check failed: %d", res);
+    lastError = res;
     {
       RenderLock lock(*this);
       state = FAILED;
@@ -97,6 +98,8 @@ void OtaUpdateActivity::render(RenderLock&&) {
 
   if (state == CHECKING_FOR_UPDATE) {
     renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_CHECKING_UPDATE));
+    renderer.drawCenteredText(UI_10_FONT_ID, top + height + metrics.verticalSpacing,
+                              (std::string(tr(STR_CURRENT_VERSION)) + CROSSPOINT_VERSION).c_str());
   } else if (state == WAITING_CONFIRMATION) {
     renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_NEW_UPDATE), true, EpdFontFamily::BOLD);
     renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, top + height + metrics.verticalSpacing,
@@ -123,11 +126,29 @@ void OtaUpdateActivity::render(RenderLock&&) {
         UI_10_FONT_ID, y,
         (std::to_string(updater.getProcessedSize()) + " / " + std::to_string(updater.getTotalSize())).c_str());
   } else if (state == NO_UPDATE) {
-    renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_NO_UPDATE), true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_UP_TO_DATE), true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_10_FONT_ID, top + height + metrics.verticalSpacing,
+                              (std::string(tr(STR_CURRENT_VERSION)) + CROSSPOINT_VERSION).c_str());
     const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   } else if (state == FAILED) {
     renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_UPDATE_FAILED), true, EpdFontFamily::BOLD);
+    const char* detail = nullptr;
+    switch (lastError) {
+      case OtaUpdater::HTTP_ERROR:
+        detail = tr(STR_UPDATE_ERR_HTTP);
+        break;
+      case OtaUpdater::JSON_PARSE_ERROR:
+        detail = tr(STR_UPDATE_ERR_PARSE);
+        break;
+      case OtaUpdater::OOM_ERROR:
+        detail = tr(STR_UPDATE_ERR_OOM);
+        break;
+      default:
+        detail = tr(STR_UPDATE_ERR_INTERNAL);
+        break;
+    }
+    renderer.drawCenteredText(UI_10_FONT_ID, top + height + metrics.verticalSpacing, detail);
     const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   } else if (state == FINISHED) {
@@ -156,6 +177,7 @@ void OtaUpdateActivity::loop() {
 
       if (res != OtaUpdater::OK) {
         LOG_DBG("OTA", "Update failed: %d", res);
+        lastError = res;
         {
           RenderLock lock(*this);
           state = FAILED;
