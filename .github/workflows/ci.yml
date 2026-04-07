@@ -108,6 +108,9 @@ jobs:
     needs: [build]
     if: github.ref == 'refs/heads/customisation' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    environment:
+      name: ota-worker
+      url: https://crosspoint-ota.siika.workers.dev
     steps:
       - uses: actions/checkout@v6
 
