@@ -200,7 +200,7 @@ class CrossPointSettings {
   // Image rendering mode in EPUB reader
   uint8_t imageRendering = IMAGES_DISPLAY;
   // Custom OTA server URL (empty = use default GitHub releases)
-  char otaServerUrl[192] = "https://crosspoint-ota.siika.workers.dev/releases/latest";
+  char otaServerUrl[192] = "https://ota.siika.net/releases/latest";
 
   ~CrossPointSettings() = default;
 
