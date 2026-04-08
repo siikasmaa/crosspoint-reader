@@ -81,8 +81,22 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
   esp_err_t esp_err;
   JsonDocument doc;
 
+  // Reset error state
+  lastHttpStatus = 0;
+  errorDetail.clear();
+
   // Use custom URL if set, otherwise fall back to default GitHub URL
   const char* updateUrl = (strlen(SETTINGS.otaServerUrl) > 0) ? SETTINGS.otaServerUrl : latestReleaseUrl;
+  LOG_DBG("OTA", "Update URL: %s", updateUrl);
+
+  // Extract hostname for display
+  serverHost.clear();
+  const char* hostStart = strstr(updateUrl, "://");
+  if (hostStart) {
+    hostStart += 3;
+    const char* hostEnd = strchr(hostStart, '/');
+    serverHost = hostEnd ? std::string(hostStart, hostEnd - hostStart) : std::string(hostStart);
+  }
 
   esp_http_client_config_t client_config = {
       .url = updateUrl,
@@ -109,6 +123,7 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
   esp_http_client_handle_t client_handle = esp_http_client_init(&client_config);
   if (!client_handle) {
     LOG_ERR("OTA", "HTTP Client Handle Failed");
+    errorDetail = "Client init failed";
     return INTERNAL_UPDATE_ERROR;
   }
 
@@ -116,22 +131,42 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
   if (esp_err != ESP_OK) {
     LOG_ERR("OTA", "esp_http_client_set_header Failed : %s", esp_err_to_name(esp_err));
     esp_http_client_cleanup(client_handle);
+    errorDetail = esp_err_to_name(esp_err);
     return INTERNAL_UPDATE_ERROR;
   }
 
   esp_err = esp_http_client_perform(client_handle);
   if (esp_err != ESP_OK) {
     LOG_ERR("OTA", "esp_http_client_perform Failed : %s", esp_err_to_name(esp_err));
+    errorDetail = esp_err_to_name(esp_err);
     esp_http_client_cleanup(client_handle);
     return HTTP_ERROR;
   }
+
+  lastHttpStatus = esp_http_client_get_status_code(client_handle);
+  LOG_DBG("OTA", "HTTP status: %d, body length: %d", lastHttpStatus, output_len);
 
   /* esp_http_client_close will be called inside cleanup as well*/
   esp_err = esp_http_client_cleanup(client_handle);
   if (esp_err != ESP_OK) {
     LOG_ERR("OTA", "esp_http_client_cleanup Failed : %s", esp_err_to_name(esp_err));
+    errorDetail = esp_err_to_name(esp_err);
     return INTERNAL_UPDATE_ERROR;
   }
+
+  if (lastHttpStatus != 200) {
+    LOG_ERR("OTA", "HTTP %d received", lastHttpStatus);
+    errorDetail = "HTTP " + std::to_string(lastHttpStatus);
+    return HTTP_STATUS_ERROR;
+  }
+
+  if (local_buf == NULL || output_len == 0) {
+    LOG_ERR("OTA", "Empty response body");
+    errorDetail = "No data received";
+    return EMPTY_RESPONSE;
+  }
+
+  LOG_DBG("OTA", "Response (%d bytes): %.80s", output_len, local_buf);
 
   filter["tag_name"] = true;
   filter["assets"][0]["name"] = true;
@@ -140,17 +175,23 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
   const DeserializationError error = deserializeJson(doc, local_buf, DeserializationOption::Filter(filter));
   if (error) {
     LOG_ERR("OTA", "JSON parse failed: %s", error.c_str());
+    // Capture first 40 chars of response for debugging
+    char preview[41] = {};
+    strncpy(preview, local_buf, 40);
+    errorDetail = std::string("Parse: ") + error.c_str() + " [" + preview + "]";
     return JSON_PARSE_ERROR;
   }
 
   if (!doc["tag_name"].is<std::string>()) {
     LOG_ERR("OTA", "No tag_name found");
-    return JSON_PARSE_ERROR;
+    errorDetail = "Missing tag_name field";
+    return MISSING_FIELDS;
   }
 
   if (!doc["assets"].is<JsonArray>()) {
     LOG_ERR("OTA", "No assets found");
-    return JSON_PARSE_ERROR;
+    errorDetail = "Missing assets field";
+    return MISSING_FIELDS;
   }
 
   latestVersion = doc["tag_name"].as<std::string>();
