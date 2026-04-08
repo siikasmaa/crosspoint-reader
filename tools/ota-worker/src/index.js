@@ -97,9 +97,11 @@ async function handleLatestRelease(env, corsHeaders) {
       ],
     };
 
-    return new Response(JSON.stringify(response), {
+    const body = JSON.stringify(response);
+    return new Response(body, {
       headers: {
         "Content-Type": "application/json",
+        "Content-Length": new TextEncoder().encode(body).length.toString(),
         ...corsHeaders,
       },
     });

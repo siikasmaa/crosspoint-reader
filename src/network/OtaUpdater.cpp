@@ -51,10 +51,25 @@ esp_err_t event_handler(esp_http_client_event_t* event) {
     }
     output_len += copy_len;
   } else {
-    /* Code might be hits here, It happened once (for version checking) but I need more logs to handle that */
-    int chunked_len;
-    esp_http_client_get_chunk_length(event->client, &chunked_len);
-    LOG_DBG("OTA", "esp_http_client_is_chunked_response failed, chunked_len: %d", chunked_len);
+    /* Chunked transfer encoding: accumulate data with realloc */
+    if (local_buf == NULL) {
+      local_buf = static_cast<char*>(malloc(event->data_len + 1));
+      output_len = 0;
+      if (local_buf == NULL) {
+        LOG_ERR("OTA", "HTTP Client Out of Memory (chunked), %d bytes", event->data_len);
+        return ESP_ERR_NO_MEM;
+      }
+    } else {
+      char* new_buf = static_cast<char*>(realloc(local_buf, output_len + event->data_len + 1));
+      if (new_buf == NULL) {
+        LOG_ERR("OTA", "HTTP Client realloc failed, %d bytes", output_len + event->data_len);
+        return ESP_ERR_NO_MEM;
+      }
+      local_buf = new_buf;
+    }
+    memcpy(local_buf + output_len, event->data, event->data_len);
+    output_len += event->data_len;
+    local_buf[output_len] = '\0';
   }
 
   return ESP_OK;
