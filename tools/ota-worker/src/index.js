@@ -81,8 +81,11 @@ async function handleLatestRelease(env, corsHeaders) {
       }
     }
 
-    // Build download URL from WORKER_URL secret or infer from request
-    const baseUrl = env.WORKER_URL || env._requestOrigin;
+    // Build download URL using the same protocol as the incoming request
+    // so HTTP requests get HTTP firmware URLs and HTTPS gets HTTPS.
+    const requestProto = new URL(env._requestOrigin).protocol;
+    let baseUrl = env.WORKER_URL || env._requestOrigin;
+    baseUrl = baseUrl.replace(/^https?:/, requestProto);
     const downloadUrl = `${baseUrl}/firmware.bin`;
 
     // Response matches GitHub releases API shape exactly
