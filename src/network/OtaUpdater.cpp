@@ -173,33 +173,18 @@ bool OtaUpdater::isUpdateNewer() const {
   sscanf(latestVersion.c_str(), "%d.%d.%d", &latestMajor, &latestMinor, &latestPatch);
   sscanf(currentVersion, "%d.%d.%d", &currentMajor, &currentMinor, &currentPatch);
 
-  /*
-   * Compare major versions.
-   * If they differ, return true if latest major version greater than current major version
-   * otherwise return false.
-   */
   if (latestMajor != currentMajor) return latestMajor > currentMajor;
-
-  /*
-   * Compare minor versions.
-   * If they differ, return true if latest minor version greater than current minor version
-   * otherwise return false.
-   */
   if (latestMinor != currentMinor) return latestMinor > currentMinor;
-
-  /*
-   * Check patch versions.
-   */
   if (latestPatch != currentPatch) return latestPatch > currentPatch;
 
-  // If we reach here, it means all segments are equal.
-  // One final check, if we're on an RC build (contains "-rc"), we should consider the latest version as newer even if
-  // the segments are equal, since RC builds are pre-release versions.
+  // Semver is equal. RC builds always accept the matching release.
   if (strstr(currentVersion, "-rc") != nullptr) {
     return true;
   }
 
-  return false;
+  // Semver is equal but full version strings differ (e.g. different commit SHA suffix).
+  // Treat as a newer build so per-commit OTA updates work.
+  return latestVersion != currentVersion;
 }
 
 const std::string& OtaUpdater::getLatestVersion() const { return latestVersion; }
