@@ -135,13 +135,11 @@ jobs:
           npx wrangler r2 object put "crosspoint-firmware/firmware.bin" \
             --file="/tmp/firmware/firmware.bin" \
             --content-type="application/octet-stream" \
-            --remote
 
           echo "{\"version\": \"$VERSION\", \"size\": $SIZE}" > /tmp/version.json
           npx wrangler r2 object put "crosspoint-firmware/version.json" \
             --file="/tmp/version.json" \
             --content-type="application/json" \
-            --remote
 
           npx wrangler deploy
 
