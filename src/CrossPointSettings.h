@@ -199,6 +199,8 @@ class CrossPointSettings {
   uint8_t showHiddenFiles = 0;
   // Image rendering mode in EPUB reader
   uint8_t imageRendering = IMAGES_DISPLAY;
+  // Custom OTA server URL (empty = use default GitHub releases)
+  char otaServerUrl[192] = "";
 
   ~CrossPointSettings() = default;
 

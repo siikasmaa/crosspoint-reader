@@ -1,5 +1,6 @@
 #include "LyraTheme.h"
 
+#include <Bitmap.h>
 #include <GfxRenderer.h>
 #include <HalGPIO.h>
 #include <HalPowerManager.h>
@@ -242,7 +243,8 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
                          const std::function<std::string(int index)>& rowTitle,
                          const std::function<std::string(int index)>& rowSubtitle,
                          const std::function<UIIcon(int index)>& rowIcon,
-                         const std::function<std::string(int index)>& rowValue, bool highlightValue) const {
+                         const std::function<std::string(int index)>& rowValue, bool highlightValue,
+                         const std::function<std::string(int index)>& rowThumbnailPath) const {
   int rowHeight =
       (rowSubtitle != nullptr) ? LyraMetrics::values.listWithSubtitleRowHeight : LyraMetrics::values.listRowHeight;
   int pageItems = rect.height / rowHeight;
@@ -285,7 +287,40 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
   int iconY = (rowSubtitle != nullptr) ? 16 : 10;
   for (int i = pageStartIndex; i < itemCount && i < pageStartIndex + pageItems; i++) {
     const int itemY = rect.y + (i % pageItems) * rowHeight;
-    int rowTextWidth = textWidth;
+
+    // Per-item text position — may be shifted right by thumbnail
+    int itemTextX = textX;
+    int itemTextWidth = textWidth;
+
+    // Attempt to draw thumbnail (replaces icon for this item if successful)
+    bool thumbnailDrawn = false;
+    if (rowThumbnailPath != nullptr) {
+      std::string thumbPath = rowThumbnailPath(i);
+      if (!thumbPath.empty()) {
+        FsFile thumbFile;
+        if (Storage.openFileForRead("LIST", thumbPath.c_str(), thumbFile)) {
+          Bitmap bmp(thumbFile);
+          if (bmp.parseHeaders() == BmpReaderError::Ok) {
+            int thumbHeight = rowHeight - 8;
+            int thumbWidth = thumbHeight * 2 / 3;
+            int thumbX = rect.x + LyraMetrics::values.contentSidePadding + hPaddingInSelection;
+            int thumbY = itemY + 4;
+            renderer.drawBitmap(bmp, thumbX, thumbY, thumbWidth, thumbHeight);
+            thumbnailDrawn = true;
+
+            // Adjust text position for thumbnail width (may differ from icon width)
+            int thumbOffset = thumbWidth + hPaddingInSelection;
+            int baseTextX = rect.x + LyraMetrics::values.contentSidePadding + hPaddingInSelection;
+            itemTextX = baseTextX + thumbOffset;
+            int baseTextWidth = contentWidth - LyraMetrics::values.contentSidePadding * 2 - hPaddingInSelection * 2;
+            itemTextWidth = baseTextWidth - thumbOffset;
+          }
+          thumbFile.close();
+        }
+      }
+    }
+
+    int rowTextWidth = itemTextWidth;
 
     // Draw name
     int valueWidth = 0;
@@ -299,9 +334,9 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
 
     auto itemName = rowTitle(i);
     auto item = renderer.truncatedText(UI_10_FONT_ID, itemName.c_str(), rowTextWidth);
-    renderer.drawText(UI_10_FONT_ID, textX, itemY + 7, item.c_str(), true);
+    renderer.drawText(UI_10_FONT_ID, itemTextX, itemY + 7, item.c_str(), true);
 
-    if (rowIcon != nullptr) {
+    if (rowIcon != nullptr && !thumbnailDrawn) {
       UIIcon icon = rowIcon(i);
       const uint8_t* iconBitmap = iconForName(icon, iconSize);
       if (iconBitmap != nullptr) {
@@ -314,7 +349,7 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
       // Draw subtitle
       std::string subtitleText = rowSubtitle(i);
       auto subtitle = renderer.truncatedText(SMALL_FONT_ID, subtitleText.c_str(), rowTextWidth);
-      renderer.drawText(SMALL_FONT_ID, textX, itemY + 30, subtitle.c_str(), true);
+      renderer.drawText(SMALL_FONT_ID, itemTextX, itemY + 30, subtitle.c_str(), true);
     }
 
     // Draw value

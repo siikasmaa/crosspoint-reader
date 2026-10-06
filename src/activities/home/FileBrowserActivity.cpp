@@ -105,10 +105,46 @@ void FileBrowserActivity::loadFiles() {
   sortFileList(files);
 }
 
+void FileBrowserActivity::loadFileThumbnails(int thumbHeight) {
+  fileThumbnailPaths.clear();
+  fileThumbnailPaths.reserve(files.size());
+
+  std::string cleanBasePath = basepath;
+  if (cleanBasePath.back() != '/') cleanBasePath += "/";
+
+  for (const auto& entry : files) {
+    if (entry.back() == '/') {
+      fileThumbnailPaths.emplace_back("");
+      continue;
+    }
+    std::string fullPath = cleanBasePath + entry;
+    std::string thumbPath;
+
+    if (FsHelpers::hasEpubExtension(entry)) {
+      std::string cachePath =
+          "/.crosspoint/epub_" + std::to_string(std::hash<std::string>{}(fullPath)) + "/thumb_" +
+          std::to_string(thumbHeight) + ".bmp";
+      if (Storage.exists(cachePath.c_str())) {
+        thumbPath = cachePath;
+      }
+    } else if (FsHelpers::hasXtcExtension(entry)) {
+      std::string cachePath =
+          "/.crosspoint/xtc_" + std::to_string(std::hash<std::string>{}(fullPath)) + "/thumb_" +
+          std::to_string(thumbHeight) + ".bmp";
+      if (Storage.exists(cachePath.c_str())) {
+        thumbPath = cachePath;
+      }
+    }
+
+    fileThumbnailPaths.emplace_back(std::move(thumbPath));
+  }
+}
+
 void FileBrowserActivity::onEnter() {
   Activity::onEnter();
 
   loadFiles();
+  loadFileThumbnails(52);
   selectorIndex = 0;
 
   requestUpdate();
@@ -117,6 +153,7 @@ void FileBrowserActivity::onEnter() {
 void FileBrowserActivity::onExit() {
   Activity::onExit();
   files.clear();
+  fileThumbnailPaths.clear();
 }
 
 void FileBrowserActivity::clearFileMetadata(const std::string& fullPath) {
@@ -133,6 +170,7 @@ void FileBrowserActivity::loop() {
       basepath != "/") {
     basepath = "/";
     loadFiles();
+    loadFileThumbnails(52);
     selectorIndex = 0;
     return;
   }
@@ -158,6 +196,7 @@ void FileBrowserActivity::loop() {
           if (Storage.remove(fullPath.c_str())) {
             LOG_DBG("FileBrowser", "Deleted successfully");
             loadFiles();
+            loadFileThumbnails(52);
             if (files.empty()) {
               selectorIndex = 0;
             } else if (selectorIndex >= files.size()) {
@@ -185,6 +224,7 @@ void FileBrowserActivity::loop() {
       if (isDirectory) {
         basepath += entry.substr(0, entry.length() - 1);
         loadFiles();
+        loadFileThumbnails(52);
         selectorIndex = 0;
         requestUpdate();
       } else {
@@ -203,6 +243,7 @@ void FileBrowserActivity::loop() {
         basepath.replace(basepath.find_last_of('/'), std::string::npos, "");
         if (basepath.empty()) basepath = "/";
         loadFiles();
+        loadFileThumbnails(52);
 
         const auto pos = oldPath.find_last_of('/');
         const std::string dirName = oldPath.substr(pos + 1) + "/";
@@ -267,7 +308,11 @@ void FileBrowserActivity::render(RenderLock&&) {
     GUI.drawList(
         renderer, Rect{0, contentTop, pageWidth, contentHeight}, files.size(), selectorIndex,
         [this](int index) { return getFileName(files[index]); }, nullptr,
-        [this](int index) { return UITheme::getFileIcon(files[index]); });
+        [this](int index) { return UITheme::getFileIcon(files[index]); }, nullptr, false,
+        [this](int index) -> std::string {
+          if (index < static_cast<int>(fileThumbnailPaths.size())) return fileThumbnailPaths[index];
+          return "";
+        });
   }
 
   // Help text

@@ -20,9 +20,11 @@ class FileBrowserActivity final : public Activity {
   // Files state
   std::string basepath = "/";
   std::vector<std::string> files;
+  std::vector<std::string> fileThumbnailPaths;
 
   // Data loading
   void loadFiles();
+  void loadFileThumbnails(int thumbHeight);
   size_t findEntry(const std::string& name) const;
 
  public:
