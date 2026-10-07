@@ -168,17 +168,16 @@ void SettingsActivity::toggleCurrentSetting() {
   } else if (setting.type == SettingType::STRING) {
     char* strPtr = reinterpret_cast<char*>(reinterpret_cast<uint8_t*>(&SETTINGS) + setting.stringOffset);
     std::string currentValue(strPtr);
-    startActivityForResult(
-        std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, std::string(I18N.get(setting.nameId)),
-                                                currentValue.empty() ? "https://" : currentValue,
-                                                setting.stringMaxLen, false),
-        [this, strPtr, maxLen = setting.stringMaxLen](const ActivityResult& result) {
-          if (!result.isCancelled) {
-            const auto& kb = std::get<KeyboardResult>(result.data);
-            snprintf(strPtr, maxLen, "%s", kb.text.c_str());
-            SETTINGS.saveToFile();
-          }
-        });
+    startActivityForResult(std::make_unique<KeyboardEntryActivity>(
+                               renderer, mappedInput, std::string(I18N.get(setting.nameId)),
+                               currentValue.empty() ? "https://" : currentValue, setting.stringMaxLen, false),
+                           [this, strPtr, maxLen = setting.stringMaxLen](const ActivityResult& result) {
+                             if (!result.isCancelled) {
+                               const auto& kb = std::get<KeyboardResult>(result.data);
+                               snprintf(strPtr, maxLen, "%s", kb.text.c_str());
+                               SETTINGS.saveToFile();
+                             }
+                           });
     return;
   } else if (setting.type == SettingType::ACTION) {
     auto resultHandler = [this](const ActivityResult&) { SETTINGS.saveToFile(); };
