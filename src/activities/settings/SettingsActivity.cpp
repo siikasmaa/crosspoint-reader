@@ -14,6 +14,7 @@
 #include "SettingsList.h"
 #include "StatusBarSettingsActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
+#include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -164,6 +165,21 @@ void SettingsActivity::toggleCurrentSetting() {
     } else {
       SETTINGS.*(setting.valuePtr) = currentValue + setting.valueRange.step;
     }
+  } else if (setting.type == SettingType::STRING) {
+    char* strPtr = reinterpret_cast<char*>(reinterpret_cast<uint8_t*>(&SETTINGS) + setting.stringOffset);
+    std::string currentValue(strPtr);
+    startActivityForResult(
+        std::make_unique<KeyboardEntryActivity>(renderer, mappedInput, std::string(I18N.get(setting.nameId)),
+                                                currentValue.empty() ? "https://" : currentValue,
+                                                setting.stringMaxLen, false),
+        [this, strPtr, maxLen = setting.stringMaxLen](const ActivityResult& result) {
+          if (!result.isCancelled) {
+            const auto& kb = std::get<KeyboardResult>(result.data);
+            snprintf(strPtr, maxLen, "%s", kb.text.c_str());
+            SETTINGS.saveToFile();
+          }
+        });
+    return;
   } else if (setting.type == SettingType::ACTION) {
     auto resultHandler = [this](const ActivityResult&) { SETTINGS.saveToFile(); };
 
@@ -242,6 +258,10 @@ void SettingsActivity::render(RenderLock&&) {
           valueText = I18N.get(setting.enumValues[value]);
         } else if (setting.type == SettingType::VALUE && setting.valuePtr != nullptr) {
           valueText = std::to_string(SETTINGS.*(setting.valuePtr));
+        } else if (setting.type == SettingType::STRING && setting.stringMaxLen > 0) {
+          const char* strPtr =
+              reinterpret_cast<const char*>(reinterpret_cast<const uint8_t*>(&SETTINGS) + setting.stringOffset);
+          valueText = strlen(strPtr) > 0 ? "..." : "";
         }
         return valueText;
       },
