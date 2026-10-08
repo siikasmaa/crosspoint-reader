@@ -11,13 +11,19 @@ class OtaUpdater {
   size_t processedSize = 0;
   size_t totalSize = 0;
   bool render = false;
+  int lastHttpStatus = 0;
+  std::string errorDetail;
+  std::string serverHost;
 
  public:
   enum OtaUpdaterError {
     OK = 0,
     NO_UPDATE,
     HTTP_ERROR,
+    HTTP_STATUS_ERROR,
+    EMPTY_RESPONSE,
     JSON_PARSE_ERROR,
+    MISSING_FIELDS,
     UPDATE_OLDER_ERROR,
     INTERNAL_UPDATE_ERROR,
     OOM_ERROR,
@@ -30,6 +36,12 @@ class OtaUpdater {
   size_t getTotalSize() const { return totalSize; }
 
   bool getRender() const { return render; }
+
+  int getLastHttpStatus() const { return lastHttpStatus; }
+
+  const std::string& getErrorDetail() const { return errorDetail; }
+
+  const std::string& getServerHost() const { return serverHost; }
 
   OtaUpdater() = default;
   bool isUpdateNewer() const;

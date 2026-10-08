@@ -98,8 +98,13 @@ void OtaUpdateActivity::render(RenderLock&&) {
 
   if (state == CHECKING_FOR_UPDATE) {
     renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_CHECKING_UPDATE));
-    renderer.drawCenteredText(UI_10_FONT_ID, top + height + metrics.verticalSpacing,
+    int y = top + height + metrics.verticalSpacing;
+    renderer.drawCenteredText(UI_10_FONT_ID, y,
                               (std::string(tr(STR_CURRENT_VERSION)) + CROSSPOINT_VERSION).c_str());
+    if (!updater.getServerHost().empty()) {
+      y += height + metrics.verticalSpacing;
+      renderer.drawCenteredText(UI_10_FONT_ID, y, updater.getServerHost().c_str());
+    }
   } else if (state == WAITING_CONFIRMATION) {
     renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_NEW_UPDATE), true, EpdFontFamily::BOLD);
     renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, top + height + metrics.verticalSpacing,
@@ -133,13 +138,23 @@ void OtaUpdateActivity::render(RenderLock&&) {
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   } else if (state == FAILED) {
     renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_UPDATE_FAILED), true, EpdFontFamily::BOLD);
+    int y = top + height + metrics.verticalSpacing;
     const char* detail = nullptr;
     switch (lastError) {
       case OtaUpdater::HTTP_ERROR:
         detail = tr(STR_UPDATE_ERR_HTTP);
         break;
+      case OtaUpdater::HTTP_STATUS_ERROR:
+        detail = tr(STR_UPDATE_ERR_HTTP_STATUS);
+        break;
+      case OtaUpdater::EMPTY_RESPONSE:
+        detail = tr(STR_UPDATE_ERR_EMPTY);
+        break;
       case OtaUpdater::JSON_PARSE_ERROR:
         detail = tr(STR_UPDATE_ERR_PARSE);
+        break;
+      case OtaUpdater::MISSING_FIELDS:
+        detail = tr(STR_UPDATE_ERR_FIELDS);
         break;
       case OtaUpdater::OOM_ERROR:
         detail = tr(STR_UPDATE_ERR_OOM);
@@ -148,7 +163,21 @@ void OtaUpdateActivity::render(RenderLock&&) {
         detail = tr(STR_UPDATE_ERR_INTERNAL);
         break;
     }
-    renderer.drawCenteredText(UI_10_FONT_ID, top + height + metrics.verticalSpacing, detail);
+    renderer.drawCenteredText(UI_10_FONT_ID, y, detail);
+    y += height + metrics.verticalSpacing;
+
+    // Show server host
+    if (!updater.getServerHost().empty()) {
+      renderer.drawCenteredText(UI_10_FONT_ID, y, updater.getServerHost().c_str());
+      y += height + metrics.verticalSpacing;
+    }
+
+    // Show error detail (HTTP status, parse error preview, etc.)
+    const auto& errorDetail = updater.getErrorDetail();
+    if (!errorDetail.empty()) {
+      renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, y, errorDetail.c_str());
+    }
+
     const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   } else if (state == FINISHED) {
