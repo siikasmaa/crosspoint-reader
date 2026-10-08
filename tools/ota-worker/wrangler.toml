@@ -2,6 +2,10 @@ name = "crosspoint-ota"
 main = "src/index.js"
 compatibility_date = "2024-09-23"
 
+routes = [
+  { pattern = "ota.example.com/*", zone_name = "example.com" }
+]
+
 # R2 bucket binding for firmware storage
 [[r2_buckets]]
 binding = "FIRMWARE_BUCKET"

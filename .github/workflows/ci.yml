@@ -110,7 +110,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: ota-worker
-      url: https://crosspoint-ota.example.workers.dev
+      url: https://ota.example.com
     steps:
       - uses: actions/checkout@v6
 
