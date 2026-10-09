@@ -110,8 +110,7 @@ void OtaUpdateActivity::render(RenderLock&&) {
   if (state == CHECKING_FOR_UPDATE) {
     renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_CHECKING_UPDATE));
     int y = top + height + metrics.verticalSpacing;
-    renderer.drawCenteredText(UI_10_FONT_ID, y,
-                              (std::string(tr(STR_CURRENT_VERSION)) + CROSSPOINT_VERSION).c_str());
+    renderer.drawCenteredText(UI_10_FONT_ID, y, (std::string(tr(STR_CURRENT_VERSION)) + CROSSPOINT_VERSION).c_str());
     if (!updater.getServerHost().empty()) {
       y += height + metrics.verticalSpacing;
       renderer.drawCenteredText(UI_10_FONT_ID, y, updater.getServerHost().c_str());
