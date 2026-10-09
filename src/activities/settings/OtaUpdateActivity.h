@@ -1,5 +1,8 @@
 #pragma once
 
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
 #include "activities/Activity.h"
 #include "network/OtaUpdater.h"
 
@@ -22,8 +25,12 @@ class OtaUpdateActivity : public Activity {
   unsigned int lastUpdaterPercentage = UNINITIALIZED_PERCENTAGE;
   OtaUpdater updater;
   OtaUpdater::OtaUpdaterError lastError = OtaUpdater::OK;
+  TaskHandle_t otaTaskHandle = nullptr;
+  volatile bool otaTaskDone = false;
+  volatile OtaUpdater::OtaUpdaterError otaTaskResult = OtaUpdater::OK;
 
   void onWifiSelectionComplete(bool success);
+  static void otaTaskFunc(void* param);
 
  public:
   explicit OtaUpdateActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)

@@ -64,7 +64,18 @@ void OtaUpdateActivity::onEnter() {
                          [this](const ActivityResult& result) { onWifiSelectionComplete(!result.isCancelled); });
 }
 
+void OtaUpdateActivity::otaTaskFunc(void* param) {
+  auto* self = static_cast<OtaUpdateActivity*>(param);
+  self->otaTaskResult = self->updater.installUpdate();
+  self->otaTaskDone = true;
+  vTaskDelete(nullptr);
+}
+
 void OtaUpdateActivity::onExit() {
+  if (otaTaskHandle) {
+    vTaskDelete(otaTaskHandle);
+    otaTaskHandle = nullptr;
+  }
   Activity::onExit();
 
   // Turn off wifi
@@ -189,11 +200,6 @@ void OtaUpdateActivity::render(RenderLock&&) {
 }
 
 void OtaUpdateActivity::loop() {
-  // TODO @ngxson : refactor this logic later
-  if (updater.getRender()) {
-    requestUpdate();
-  }
-
   if (state == WAITING_CONFIRMATION) {
     if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
       LOG_DBG("OTA", "New update available, starting download...");
@@ -202,30 +208,37 @@ void OtaUpdateActivity::loop() {
         state = UPDATE_IN_PROGRESS;
       }
       requestUpdateAndWait();
-      const auto res = updater.installUpdate();
-
-      if (res != OtaUpdater::OK) {
-        LOG_DBG("OTA", "Update failed: %d", res);
-        lastError = res;
-        {
-          RenderLock lock(*this);
-          state = FAILED;
-        }
-        requestUpdate();
-        return;
-      }
-
-      {
-        RenderLock lock(*this);
-        state = FINISHED;
-      }
-      requestUpdate();
+      otaTaskDone = false;
+      xTaskCreate(otaTaskFunc, "OTA", 4096, this, 1, &otaTaskHandle);
     }
 
     if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
       finish();
     }
 
+    return;
+  }
+
+  if (state == UPDATE_IN_PROGRESS) {
+    if (otaTaskDone) {
+      otaTaskHandle = nullptr;
+      if (otaTaskResult != OtaUpdater::OK) {
+        LOG_DBG("OTA", "Update failed: %d", otaTaskResult);
+        lastError = otaTaskResult;
+        {
+          RenderLock lock(*this);
+          state = FAILED;
+        }
+      } else {
+        {
+          RenderLock lock(*this);
+          state = FINISHED;
+        }
+      }
+      requestUpdate();
+    } else if (updater.getRender()) {
+      requestUpdate();
+    }
     return;
   }
 
