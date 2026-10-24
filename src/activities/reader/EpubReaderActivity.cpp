@@ -55,7 +55,6 @@ namespace {
 bool xteinkClassPanel() { return gpio.isXteinkDevice() || BoardConfig::isX4Pro() || BoardConfig::isX4Classic(); }
 
 constexpr int PAGE_TURN_RATES[] = {1, 1, 3, 6, 12};
-constexpr size_t initialBookmarkCacheCapacity = 16;
 constexpr float bookmarkProgressEpsilon = 0.0001f;
 
 int clampPercent(int percent) {
@@ -2604,9 +2603,6 @@ void EpubReaderActivity::restoreSavedPosition() {
 
 void EpubReaderActivity::loadCachedBookmarks() {
   cachedBookmarks.clear();
-  if (cachedBookmarks.capacity() < initialBookmarkCacheCapacity) {
-    cachedBookmarks.reserve(initialBookmarkCacheCapacity);
-  }
   if (!epub) {
     currentPageBookmarked = false;
     return;
