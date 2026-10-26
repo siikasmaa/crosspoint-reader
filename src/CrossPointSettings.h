@@ -1,4 +1,9 @@
 #pragma once
+
+#ifndef CROSSPOINT_OTA_SERVER_URL
+#define CROSSPOINT_OTA_SERVER_URL ""
+#endif
+
 #include <HalStorage.h>
 
 #include <cstdint>
@@ -199,8 +204,9 @@ class CrossPointSettings {
   uint8_t showHiddenFiles = 0;
   // Image rendering mode in EPUB reader
   uint8_t imageRendering = IMAGES_DISPLAY;
-  // Custom OTA server URL (empty = use default GitHub releases)
-  char otaServerUrl[192] = "http://ota.example.com/releases/latest";
+  // Custom OTA server URL (empty = use default GitHub releases).
+  // The build-time default comes from OTA_SERVER_URL in .env (see scripts/load_env.py).
+  char otaServerUrl[192] = CROSSPOINT_OTA_SERVER_URL;
 
   ~CrossPointSettings() = default;
 

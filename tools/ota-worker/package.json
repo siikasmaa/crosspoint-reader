@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "deploy": "wrangler deploy",
+    "deploy": "node deploy.mjs",
     "dev": "wrangler dev"
   },
   "devDependencies": {

@@ -15,3 +15,11 @@ build
 .history/
 /.venv
 *.local*
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+.dev.vars
+.wrangler
+node_modules
