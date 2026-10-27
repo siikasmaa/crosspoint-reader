@@ -1,3 +1,4 @@
+// cppcheck-suppress-file passedByValue ; freeink::ui::DrawTarget's virtuals take Rect/Paint/Style by value
 #include "CoverThumbTarget.h"
 
 #include <Bitmap.h>

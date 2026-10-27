@@ -1,5 +1,7 @@
 #pragma once
 
+// cppcheck-suppress-file passedByValue ; freeink::ui::DrawTarget's virtuals take Rect/Paint/Style by value
+
 #include <FreeInkUIGfxRenderer.h>
 
 class GfxRenderer;
