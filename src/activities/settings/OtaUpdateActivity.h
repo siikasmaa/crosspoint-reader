@@ -22,16 +22,16 @@ class OtaUpdateActivity : public Activity {
   State state = WIFI_SELECTION;
   unsigned int lastUpdaterPercentage = UNINITIALIZED_PERCENTAGE;
   OtaUpdater updater;
-  // Optional detail line shown under the generic "Update failed" heading.
-  // Points into the i18n string table (flash-resident, so no lifetime concern);
-  // nullptr means no extra detail.
-  const char* failedDetail = nullptr;
+  // Result of the failed check/install, rendered as a reason line under the
+  // generic "Update failed" heading.
+  OtaUpdater::OtaUpdaterError lastError = OtaUpdater::OK;
   // Cancel/Update confirmation over the version info (replaces the old
   // hand-rolled bottom tap rects).
   OptionPopup confirmPopup;
 
   void onWifiSelectionComplete(bool success);
   void runUpdateInstall();
+  const char* failureReason() const;
 
  public:
   explicit OtaUpdateActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)

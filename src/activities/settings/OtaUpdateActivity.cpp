@@ -41,6 +41,7 @@ void OtaUpdateActivity::onWifiSelectionComplete(const bool success) {
     LOG_DBG("OTA", "Update check failed: %d", res);
     {
       RenderLock lock(*this);
+      lastError = res;
       state = FAILED;
     }
     return;
@@ -123,6 +124,12 @@ void OtaUpdateActivity::render(RenderLock&&) {
 
   if (state == CHECKING_FOR_UPDATE) {
     renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_CHECKING_UPDATE));
+    int y = top + height + metrics.verticalSpacing;
+    renderer.drawCenteredText(UI_10_FONT_ID, y, (std::string(tr(STR_CURRENT_VERSION)) + CROSSPOINT_VERSION).c_str());
+    if (!updater.getServerHost().empty()) {
+      y += height + metrics.verticalSpacing;
+      renderer.drawCenteredText(UI_10_FONT_ID, y, updater.getServerHost().c_str());
+    }
   } else if (state == WAITING_CONFIRMATION) {
     // Version info sits in the upper part of the screen so the centered
     // Cancel/Update popup doesn't cover it (same layout as ConfirmationActivity).
@@ -150,13 +157,29 @@ void OtaUpdateActivity::render(RenderLock&&) {
         UI_10_FONT_ID, y,
         (std::to_string(updater.getProcessedSize()) + " / " + std::to_string(updater.getTotalSize())).c_str());
   } else if (state == NO_UPDATE) {
-    renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_NO_UPDATE), true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_UP_TO_DATE), true, EpdFontFamily::BOLD);
+    int y = top + height + metrics.verticalSpacing;
+    renderer.drawCenteredText(UI_10_FONT_ID, y, (std::string(tr(STR_CURRENT_VERSION)) + CROSSPOINT_VERSION).c_str());
+    if (!updater.getServerHost().empty()) {
+      y += height + metrics.verticalSpacing;
+      renderer.drawCenteredText(UI_10_FONT_ID, y, updater.getServerHost().c_str());
+    }
     const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   } else if (state == FAILED) {
     renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_UPDATE_FAILED), true, EpdFontFamily::BOLD);
-    if (failedDetail != nullptr) {
-      renderer.drawCenteredText(UI_10_FONT_ID, top + height + metrics.verticalSpacing, failedDetail);
+    int y = top + height + metrics.verticalSpacing;
+    renderer.drawCenteredText(UI_10_FONT_ID, y, failureReason());
+    y += height + metrics.verticalSpacing;
+    renderer.drawCenteredText(UI_10_FONT_ID, y, (std::string(tr(STR_CURRENT_VERSION)) + CROSSPOINT_VERSION).c_str());
+    if (!updater.getServerHost().empty()) {
+      y += height + metrics.verticalSpacing;
+      renderer.drawCenteredText(UI_10_FONT_ID, y, updater.getServerHost().c_str());
+    }
+    // Untranslated detail (response preview, missing field) for bug reports.
+    if (!updater.getErrorDetail().empty()) {
+      y += height + metrics.verticalSpacing;
+      renderer.drawCenteredText(UI_10_FONT_ID, y, updater.getErrorDetail().c_str());
     }
     const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
@@ -170,6 +193,25 @@ void OtaUpdateActivity::render(RenderLock&&) {
   }
 
   renderer.displayBuffer();
+}
+
+const char* OtaUpdateActivity::failureReason() const {
+  switch (lastError) {
+    case OtaUpdater::HTTP_ERROR:
+      return tr(STR_UPDATE_ERR_HTTP);
+    case OtaUpdater::EMPTY_RESPONSE:
+      return tr(STR_UPDATE_ERR_EMPTY);
+    case OtaUpdater::JSON_PARSE_ERROR:
+      return tr(STR_UPDATE_ERR_PARSE);
+    case OtaUpdater::MISSING_FIELDS:
+      return tr(STR_UPDATE_ERR_FIELDS);
+    case OtaUpdater::OOM_ERROR:
+      return tr(STR_UPDATE_ERR_OOM);
+    case OtaUpdater::WRONG_DEVICE_ERROR:
+      return tr(STR_FIRMWARE_WRONG_DEVICE);
+    default:
+      return tr(STR_UPDATE_ERR_INTERNAL);
+  }
 }
 
 void OtaUpdateActivity::runUpdateInstall() {
@@ -192,7 +234,7 @@ void OtaUpdateActivity::runUpdateInstall() {
     LOG_DBG("OTA", "Update failed: %d", res);
     {
       RenderLock lock(*this);
-      failedDetail = res == OtaUpdater::WRONG_DEVICE_ERROR ? tr(STR_FIRMWARE_WRONG_DEVICE) : nullptr;
+      lastError = res;
       state = FAILED;
     }
     requestUpdate();

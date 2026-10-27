@@ -18,6 +18,8 @@ class ReleaseJsonParser {
   // Release-asset filename to match (default "firmware.bin").
   void setFirmwareAssetName(const char* name);
 
+  // True once the underlying JSON tokenizer has rejected the input.
+  bool hasError() const { return parser.hasError(); }
   bool foundTag() const;
   bool foundFirmware() const;
   const char* getTagName() const;

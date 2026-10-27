@@ -36,6 +36,14 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
   const char* releaseUrl = customServer ? SETTINGS.otaServerUrl : latestReleaseUrl;
   LOG_DBG("OTA", "Release URL: %s", releaseUrl);
 
+  errorDetail.clear();
+  serverHost.clear();
+  if (const char* host = strstr(releaseUrl, "://")) {
+    host += 3;
+    const char* hostEnd = strchr(host, '/');
+    serverHost.assign(host, hostEnd ? static_cast<size_t>(hostEnd - host) : strlen(host));
+  }
+
   // Stream the ~32KB release JSON straight into the parser as it arrives.
   // Buffering the whole body in a std::string would add a growing allocation
   // on top of the TLS session's heap during the fetch; with -fno-exceptions an
@@ -56,7 +64,15 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
   // has streamed past; the custom server's name is fixed up front.
   bool assetNameSet = customServer;
   if (customServer) snprintf(assetName, sizeof(assetName), "%s", customServerAssetName);
+  size_t bodyLen = 0;
+  // First bytes of the body, kept for the error screen when parsing fails.
+  char preview[33] = {};
   const bool ok = HttpDownloader::fetchUrl(releaseUrl, [&](const uint8_t* data, size_t len) {
+    if (bodyLen < sizeof(preview) - 1) {
+      const size_t take = std::min(len, sizeof(preview) - 1 - bodyLen);
+      memcpy(preview + bodyLen, data, take);
+    }
+    bodyLen += len;
     size_t offset = 0;
     while (!assetNameSet && offset < len) {
       releaseParser.feed(reinterpret_cast<const char*>(data + offset), 1);
@@ -71,16 +87,32 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
     return true;
   });
   if (!ok) {
+    // fetchUrl folds connect failures, non-200 statuses and short reads into
+    // one result; the serial log (HTTP tag) has the specific cause.
     LOG_ERR("OTA", "Release check fetch failed");
+    errorDetail = bodyLen > 0 ? "Transfer incomplete" : "Connect or HTTP status failure";
     return HTTP_ERROR;
   }
 
-  LOG_DBG("OTA", "Parser results: tag=%s firmware=%s", releaseParser.foundTag() ? "yes" : "no",
+  LOG_DBG("OTA", "Parser results: body=%zu tag=%s firmware=%s", bodyLen, releaseParser.foundTag() ? "yes" : "no",
           releaseParser.foundFirmware() ? "yes" : "no");
+
+  if (bodyLen == 0) {
+    LOG_ERR("OTA", "Empty response body");
+    errorDetail = "No data received";
+    return EMPTY_RESPONSE;
+  }
+
+  if (releaseParser.hasError()) {
+    LOG_ERR("OTA", "Release JSON malformed: %.32s", preview);
+    errorDetail = std::string("[") + preview + "]";
+    return JSON_PARSE_ERROR;
+  }
 
   if (!releaseParser.foundTag()) {
     LOG_ERR("OTA", "No tag_name in release JSON");
-    return JSON_PARSE_ERROR;
+    errorDetail = "tag_name";
+    return MISSING_FIELDS;
   }
 
   if (!releaseParser.foundFirmware()) {
