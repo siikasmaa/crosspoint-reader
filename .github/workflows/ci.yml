@@ -2,7 +2,9 @@ name: CI (build)
 
 on:
   push:
-    branches: [master]
+    # Fork working branches. Pushes here also publish the default (ESP32-C3)
+    # build to the self-hosted OTA server, see the deploy-ota job below.
+    branches: [customisation, customisation-v2]
   pull_request:
 
 permissions:
@@ -145,6 +147,11 @@ jobs:
           ~/.platformio/penv/bin/pio --version
 
       - name: Build ${{ matrix.env }} firmware
+        env:
+          # scripts/git_branch.py embeds the commit SHA in CROSSPOINT_VERSION;
+          # scripts/load_env.py bakes OTA_SERVER_URL in as the default OTA server.
+          CROSSPOINT_BUILD_SHA: ${{ github.sha }}
+          OTA_SERVER_URL: ${{ vars.OTA_SERVER_URL }}
         run: |
           set -euo pipefail
           pio run -e ${{ matrix.env }} | tee pio.log
@@ -168,6 +175,74 @@ jobs:
           name: ${{ matrix.asset }}
           path: .pio/build/${{ matrix.env }}/firmware.bin
           if-no-files-found: error
+
+  # Publish the default (ESP32-C3 X3/X4) build of every push to the fork's
+  # working branch to the self-hosted OTA server (tools/ota-worker). The other
+  # matrix targets are only built. Not part of test-status, so PRs are unaffected.
+  deploy-ota:
+    name: Deploy OTA (default)
+    needs: [build]
+    if: >-
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/customisation' || github.ref == 'refs/heads/customisation-v2')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-ota
+      cancel-in-progress: false
+    environment:
+      name: ota-worker
+      url: ${{ vars.OTA_SERVER_URL }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install wrangler
+        working-directory: tools/ota-worker
+        run: npm ci
+
+      - name: Download default firmware artifact
+        uses: actions/download-artifact@v6
+        with:
+          # Must match `matrix.asset` of the `default` build env above.
+          name: firmware.bin
+          path: /tmp/firmware
+
+      - name: Upload to R2 and deploy worker
+        working-directory: tools/ota-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          OTA_ROUTE_PATTERN: ${{ vars.OTA_ROUTE_PATTERN }}
+        run: |
+          set -euo pipefail
+          FIRMWARE=/tmp/firmware/firmware.bin
+          test -s "$FIRMWARE"
+
+          # Base version comes from the `version =` line of platformio.ini.
+          BASE_VERSION="$(sed -n 's/^version[[:space:]]*=[[:space:]]*//p' ../../platformio.ini | head -n1)"
+          test -n "$BASE_VERSION"
+          VERSION="${BASE_VERSION}-${GITHUB_SHA::7}"
+          SIZE="$(stat -c%s "$FIRMWARE")"
+
+          npx wrangler r2 object put "crosspoint-firmware/firmware.bin" \
+            --file="$FIRMWARE" \
+            --content-type="application/octet-stream"
+
+          printf '{"version": "%s", "size": %s}\n' "$VERSION" "$SIZE" > /tmp/version.json
+          npx wrangler r2 object put "crosspoint-firmware/version.json" \
+            --file="/tmp/version.json" \
+            --content-type="application/json"
+
+          npm run deploy
+
+          {
+            echo "## OTA deploy"
+            echo "- Version: \`$VERSION\`"
+            echo "- Size: $SIZE bytes"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   unit-tests:
     runs-on: ubuntu-latest
