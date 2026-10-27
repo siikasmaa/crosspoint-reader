@@ -34,6 +34,7 @@
 #include "TextSettingsActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "activities/util/IntervalSelectionActivity.h"
+#include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
 #include "components/UIThemeTokens.h"
 #include "components/UiAppHelpers.h"
@@ -339,6 +340,32 @@ void SettingsActivity::toggleCurrentSetting() {
     } else {
       SETTINGS.*(setting.valuePtr) = currentValue + setting.valueRange.step;
     }
+  } else if (setting.type == SettingType::STRING && setting.stringMaxLen > 0) {
+    // Direct char[] settings are edited on the keyboard. The only one surfaced
+    // on-device today is a URL, so an empty value prefills the scheme.
+    char* strPtr = reinterpret_cast<char*>(&SETTINGS) + setting.stringOffset;
+    const bool isUrl = setting.nameId == StrId::STR_OTA_SERVER_URL;
+    const std::string currentValue(strPtr);
+    const std::string initialText = (isUrl && currentValue.empty()) ? "https://" : currentValue;
+    // maxLength counts characters; keep one byte for the terminator.
+    auto activity = makeUniqueNoThrow<KeyboardEntryActivity>(renderer, mappedInput, I18N.get(setting.nameId),
+                                                              initialText, setting.stringMaxLen - 1,
+                                                              isUrl ? InputType::Url : InputType::Text);
+    if (!activity) {
+      LOG_ERR("SETTINGS", "OOM: KeyboardEntryActivity");
+      return;
+    }
+    startActivityForResult(std::move(activity),
+                           [this, strPtr, maxLen = setting.stringMaxLen, isUrl](const ActivityResult& result) {
+                             if (result.isCancelled) return;
+                             const auto& kb = std::get<KeyboardResult>(result.data);
+                             // A bare scheme means the user cleared the field.
+                             const bool bareScheme = isUrl && (kb.text == "https://" || kb.text == "http://");
+                             snprintf(strPtr, maxLen, "%s", bareScheme ? "" : kb.text.c_str());
+                             SETTINGS.saveToFile();
+                             requestUpdate();
+                           });
+    return;
   } else if (setting.type == SettingType::ACTION) {
     auto resultHandler = [this](const ActivityResult&) { SETTINGS.saveToFile(); };
 
@@ -531,6 +558,15 @@ std::string SettingsActivity::settingValueText(const SettingInfo& setting) {
       return valueBuffer;
     }
     return std::to_string(SETTINGS.*(setting.valuePtr));
+  }
+  if (setting.type == SettingType::STRING && setting.stringMaxLen > 0) {
+    // Rows are narrow: show only the host of a URL, the raw value otherwise.
+    const char* value = reinterpret_cast<const char*>(&SETTINGS) + setting.stringOffset;
+    const char* host = strstr(value, "://");
+    if (host == nullptr) return value;
+    host += 3;
+    const char* hostEnd = strchr(host, '/');
+    return hostEnd ? std::string(host, hostEnd - host) : std::string(host);
   }
   return "";
 }

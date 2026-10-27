@@ -1,5 +1,11 @@
 #pragma once
 
+// Build-time default for the OTA server setting; scripts/load_env.py sets it
+// from OTA_SERVER_URL in .env. Empty means the upstream GitHub releases API.
+#ifndef CROSSPOINT_OTA_SERVER_URL
+#define CROSSPOINT_OTA_SERVER_URL ""
+#endif
+
 #include <ArduinoJson.h>
 #include <Epub/ReaderRenderSpec.h>
 #include <PersistableStore.h>
@@ -311,6 +317,9 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // 2=Title). See OpdsFilenameFormat. Persisted via a category-less SettingInfo::Enum,
   // edited from the OPDS server list; hidden from the on-device Settings screen.
   uint8_t opdsFilenameFormat = 0;
+  // Custom OTA release-metadata URL ("" = upstream GitHub releases). The
+  // endpoint returns GitHub-style release JSON with a "firmware.bin" asset.
+  char otaServerUrl[192] = CROSSPOINT_OTA_SERVER_URL;
   // Hide battery percentage
   uint8_t hideBatteryPercentage = HIDE_NEVER;
   // Long-press page turn button behavior

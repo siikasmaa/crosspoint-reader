@@ -15,15 +15,26 @@
 #include <cstring>
 #include <string>
 
+#include "CrossPointSettings.h"
 #include "FirmwareBoardTag.h"
 #include "FirmwareFlasher.h"
 
 namespace {
 constexpr char latestReleaseUrl[] = "https://api.github.com/repos/crosspoint-reader/crosspoint-reader/releases/latest";
+// Asset name a self-hosted OTA server publishes (see tools/ota-worker).
+constexpr char customServerAssetName[] = "firmware.bin";
 }  // namespace
 
 OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
   LOG_DBG("OTA", "Checking for update (current: %s)", CROSSPOINT_VERSION);
+
+  // A custom server replaces the GitHub releases API. It serves the same JSON
+  // shape but a single, board-agnostic "firmware.bin" asset, and may be plain
+  // http:// -- HttpDownloader picks the transport from the URL scheme, so no
+  // TLS exemption is needed.
+  const bool customServer = SETTINGS.otaServerUrl[0] != '\0';
+  const char* releaseUrl = customServer ? SETTINGS.otaServerUrl : latestReleaseUrl;
+  LOG_DBG("OTA", "Release URL: %s", releaseUrl);
 
   // Stream the ~32KB release JSON straight into the parser as it arrives.
   // Buffering the whole body in a std::string would add a growing allocation
@@ -31,7 +42,7 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
   // OOM there aborts. fetchUrl handles the verified-https GET, redirects, and
   // User-Agent (see HttpDownloader).
   ReleaseJsonParser releaseParser;
-  releaseParser.setFirmwareAssetName("");
+  releaseParser.setFirmwareAssetName(customServer ? customServerAssetName : "");
   // Each board updates from crosspoint-<version>-<device>.bin. The combined
   // C3 image uses x3-x4; other asset suffixes match their firmware board tag.
   const bool isX4 = board_tag::boardNameLen() == 2 && memcmp(board_tag::boardName(), "x4", 2) == 0;
@@ -41,8 +52,11 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
              board_tag::boardName());
   }
   char assetName[48] = {};
-  bool assetNameSet = false;
-  const bool ok = HttpDownloader::fetchUrl(latestReleaseUrl, [&](const uint8_t* data, size_t len) {
+  // The GitHub asset name embeds the tag, so it is only known once tag_name
+  // has streamed past; the custom server's name is fixed up front.
+  bool assetNameSet = customServer;
+  if (customServer) snprintf(assetName, sizeof(assetName), "%s", customServerAssetName);
+  const bool ok = HttpDownloader::fetchUrl(releaseUrl, [&](const uint8_t* data, size_t len) {
     size_t offset = 0;
     while (!assetNameSet && offset < len) {
       releaseParser.feed(reinterpret_cast<const char*>(data + offset), 1);
