@@ -32,3 +32,11 @@ lib/EpdFont/scripts/output/
 /sdkconfig.*
 sdkconfig.sticky
 flake.*
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+.dev.vars
+.wrangler
+node_modules
