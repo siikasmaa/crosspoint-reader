@@ -4,7 +4,7 @@ on:
   push:
     # Fork working branches. Pushes here also publish the default (ESP32-C3)
     # build to the self-hosted OTA server, see the deploy-ota job below.
-    branches: [customisation, customisation-v2]
+    branches: [customisation]
   pull_request:
 
 permissions:
@@ -184,7 +184,7 @@ jobs:
     needs: [build]
     if: >-
       github.event_name == 'push' &&
-      (github.ref == 'refs/heads/customisation' || github.ref == 'refs/heads/customisation-v2')
+      github.ref == 'refs/heads/customisation'
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-ota

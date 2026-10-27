@@ -5,7 +5,7 @@ name: Deploy OTA Worker
 
 on:
   push:
-    branches: [customisation, customisation-v2]
+    branches: [customisation]
     paths:
       - 'tools/ota-worker/**'
   workflow_dispatch:
