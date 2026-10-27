@@ -171,7 +171,10 @@ bool OtaUpdater::isUpdateNewer() const {
     return true;
   }
 
-  return false;
+  // Equal semver but a different full string (e.g. 1.6.5-abc1234 vs
+  // 1.6.5-def5678): treat as newer so per-commit builds from a custom OTA
+  // server install. Identical strings were rejected at the top.
+  return true;
 }
 
 const std::string& OtaUpdater::getLatestVersion() const { return latestVersion; }
