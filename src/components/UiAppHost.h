@@ -4,6 +4,8 @@
 
 #include <atomic>
 
+#include "components/CoverThumbTarget.h"
+
 class GfxRenderer;
 class MappedInputManager;
 
@@ -69,6 +71,9 @@ class UiAppHost {
   bool routingReady() const { return uiReady.load(); }
 
   freeink::ui::GfxRendererTarget uiTarget;  // must precede `app`: the app holds a reference to it
+  // What the app draws through: uiTarget plus the cover-thumbnail hook, so a
+  // list row can stream a cached cover into its icon slot.
+  CoverThumbTarget thumbTarget;
   UiApp app;
 
  private:

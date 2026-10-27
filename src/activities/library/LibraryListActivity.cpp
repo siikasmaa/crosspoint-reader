@@ -18,6 +18,8 @@
 #include "RecentBooksStore.h"
 #include "activities/util/ConfirmationActivity.h"
 #include "activities/util/KeyboardEntryActivity.h"
+#include "components/CoverThumbTarget.h"
+#include "components/ListCoverThumbs.h"
 #include "components/UIScale.h"
 #include "components/UITheme.h"
 #include "components/icons/headerIcons.h"
@@ -516,6 +518,41 @@ int LibraryListActivity::rowFor(const int entry) const {
 
 bool LibraryListActivity::groupable() const { return !degraded && !isRecentSort(sortOrder) && bookRowCount() > 0; }
 
+int LibraryListActivity::recentBookForEntry(const int entry) const {
+  if (entry < pinnedCount()) return entry;
+  if (!isRecentSort(sortOrder) || !index.isOpen()) return -1;
+  const int total = static_cast<int>(index.bookCount());
+  const int row = rowFor(entry);
+  const int ascRow = isDescending(sortOrder) ? total - 1 - row : row;
+  for (int i = 0; i < pinnedTotal; i++) {
+    if (pinnedAscRows[i] == ascRow) return i;
+  }
+  return -1;
+}
+
+void LibraryListActivity::generateRecentThumbs() {
+  thumbsPending = false;
+  if (thumbHeight <= 0) return;
+  const auto& books = RECENT_BOOKS.getBooks();
+  const size_t count = std::min<size_t>(books.size(), RecentBooksStore::MAX_RECENT_BOOKS);
+  bool showingLoading = false;
+  Rect popupRect;
+  char thumbPath[ListCoverThumbs::PATH_BUF_SIZE];
+  for (size_t i = 0; i < count; i++) {
+    const std::string& path = books[i].path;
+    if (!ListCoverThumbs::thumbPathFor(path, thumbHeight, thumbPath, sizeof(thumbPath))) continue;
+    if (Storage.exists(thumbPath)) continue;
+    if (!showingLoading) {
+      showingLoading = true;
+      popupRect = GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
+    }
+    GUI.fillPopupProgress(renderer, popupRect, static_cast<int>(i * 100 / count));
+    ListCoverThumbs::generate(path, thumbHeight);
+  }
+  // The popup painted over the list; repaint it with whatever was generated.
+  if (showingLoading) requestUpdate();
+}
+
 uint32_t LibraryListActivity::titleInitialFor(const int entry) {
   const uint16_t ordinal = index.ordinalForRow(sortOrder, static_cast<uint16_t>(rowFor(entry)));
   library::ClixRecord record{};
@@ -825,6 +862,20 @@ void LibraryListActivity::buildRows(UiScreen& screen) {
   winItems.clear();
   if (winItems.capacity() < cap) winItems.reserve(cap);
 
+  // Cover thumbnails replace the icon on the recently opened books' rows. The
+  // height follows the resolved row metrics, so a font or theme change
+  // re-measures it and the missing files are generated after this render.
+  const bool thumbs = ListCoverThumbs::enabled() && !groupsCollapsed;
+  if (thumbs) {
+    const int height = ListCoverThumbs::rowThumbHeight(screen);
+    if (height != thumbHeight) {
+      thumbHeight = height;
+      thumbsPending = height > 0;
+    }
+    if (winThumbs.size() < cap) winThumbs.resize(cap);
+  }
+  const auto& recentBooks = RECENT_BOOKS.getBooks();
+
   int rows = 0;
   int headers = 0;
   uint32_t previousInitial = 0;
@@ -867,8 +918,20 @@ void LibraryListActivity::buildRows(UiScreen& screen) {
     }
 
     item.label = title.c_str();
-    // Group headings stay bare; every book row gets its file-type icon.
-    if (!groupsCollapsed && !rowFile.empty()) item.icon = listIconFor(UITheme::getFileIcon(rowFile), 32);
+    // Group headings stay bare; every book row gets its file-type icon, or its
+    // cover when a recently opened book's thumbnail is already on the card.
+    if (!groupsCollapsed && !rowFile.empty()) {
+      item.icon = listIconFor(UITheme::getFileIcon(rowFile), 32);
+      const int recent = thumbs && thumbHeight > 0 ? recentBookForEntry(entry) : -1;
+      if (recent >= 0 && recent < static_cast<int>(recentBooks.size())) {
+        auto& thumbPath = winThumbs[static_cast<size_t>(rows)];
+        if (ListCoverThumbs::cachedThumbPath(recentBooks[static_cast<size_t>(recent)].path, thumbHeight,
+                                             thumbPath.data(), thumbPath.size())) {
+          item.icon = CoverThumbTarget::coverThumbRef(thumbPath.data(), ListCoverThumbs::slotWidth(thumbHeight),
+                                                      thumbHeight);
+        }
+      }
+    }
     item.actionValue = static_cast<int16_t>(entry);
     winItems.push_back(item);
     rows++;
@@ -1022,6 +1085,9 @@ void LibraryListActivity::drawHoldHelp() const {
 void LibraryListActivity::render(RenderLock&& lock) {
   if (optionPopup.processRender(renderer, mappedInput)) return;
   UiTabListActivity::render(std::move(lock));
+  // The build above measured the thumbnail height; the rows already showed
+  // whatever was cached, so the popup only appears when something is missing.
+  if (thumbsPending) generateRecentThumbs();
 }
 
 void LibraryListActivity::drawFooter() {

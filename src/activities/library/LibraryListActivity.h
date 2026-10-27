@@ -2,6 +2,7 @@
 
 #include <LibraryIndexFile.h>
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -9,6 +10,7 @@
 
 #include "RecentBooksStore.h"
 #include "activities/UiTabListActivity.h"
+#include "components/ListCoverThumbs.h"
 #include "components/OptionPopup.h"
 
 // One Library screen: every indexed book on the card shown by recency, title,
@@ -182,6 +184,24 @@ class LibraryListActivity final : public UiTabListActivity {
   uint16_t overlapRows[RecentBooksStore::MAX_RECENT_BOOKS] = {};
   uint8_t pinnedTotal = 0;
   uint8_t overlapCount = 0;
+
+  // --- cover thumbnails (Lyra) ----------------------------------------------
+  // Store entry shown at `entry`, or -1. Pinned rows are the store's own; on
+  // the Recent sort the other rows match through pinnedAscRows, which is the
+  // only row space the store was resolved in. No path read, so paging stays
+  // free; the store's books are the only rows that ever carry a thumbnail.
+  int recentBookForEntry(int entry) const;
+  // Generates the store's missing thumbnails at thumbHeight (popup progress),
+  // then repaints if any were made. Runs after the build that measured the
+  // height, on the render task like HomeActivity's cover loading.
+  void generateRecentThumbs();
+  // Measured from the resolved row metrics in buildRows; 0 until then or when
+  // thumbnails are off for the active theme.
+  int thumbHeight = 0;
+  bool thumbsPending = false;
+  // Thumbnail paths for the visible window; the SDK reads each row's path
+  // pointer during that row's layout and draw, so one slot per window row.
+  std::vector<std::array<char, ListCoverThumbs::PATH_BUF_SIZE>> winThumbs;
 
   bool lockNextConfirmRelease = false;
   bool lockNextBackRelease = false;

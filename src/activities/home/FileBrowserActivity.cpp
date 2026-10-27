@@ -16,6 +16,7 @@
 #include "RecentBooksStore.h"
 #include "activities/util/ConfirmationActivity.h"
 #include "activities/util/KeyboardEntryActivity.h"
+#include "components/CoverThumbTarget.h"
 #include "components/UITheme.h"
 #include "components/UiAppHelpers.h"
 #include "fontIds.h"
@@ -162,6 +163,16 @@ void FileBrowserActivity::provideRow(void* ctx, const uint16_t index, fui::ListI
     item.value = self->rowExtBuf;
   }
   item.icon = listIconFor(UITheme::getFileIcon(entry));
+  if (self->thumbHeight > 0 && entry.back() != '/') {
+    self->rowPathBuf.assign(self->basepath);
+    if (self->rowPathBuf.back() != '/') self->rowPathBuf += '/';
+    self->rowPathBuf += entry;
+    if (ListCoverThumbs::cachedThumbPath(self->rowPathBuf, self->thumbHeight, self->rowThumbBuf,
+                                         sizeof(self->rowThumbBuf))) {
+      item.icon = CoverThumbTarget::coverThumbRef(self->rowThumbBuf, ListCoverThumbs::slotWidth(self->thumbBoxHeight),
+                                                  self->thumbBoxHeight);
+    }
+  }
   item.actionValue = static_cast<int16_t>(index);
 }
 
@@ -209,6 +220,7 @@ void FileBrowserActivity::onEnter() {
     LOG_ERR("FileBrowser", "malloc failed for name buffer");
     return;
   }
+  rowPathBuf.reserve(128);
 
   auto root = Storage.open(basepath.c_str());
   if (!root) {
@@ -656,6 +668,13 @@ void FileBrowserActivity::buildScreen(UiScreen& screen) {
   // 60%-band wrap cap and let both name lines run the full width before it.
   props.balanceWrappedLabelWithValue = false;
   syncListViewport(screen, props);
+  // The cached file is the Library's, so its height is measured the same way;
+  // this list's (shorter) rows scale it down to fit.
+  thumbHeight = 0;
+  if (mode == Mode::Books && ListCoverThumbs::enabled()) {
+    thumbBoxHeight = ListCoverThumbs::boxHeightForRow(props.rowHeight);
+    if (thumbBoxHeight > 0) thumbHeight = ListCoverThumbs::rowThumbHeight(screen);
+  }
   // Prewarm the window at the final viewport (syncListViewport just applied
   // follow/clamping to nav.top) before the list resolves rows through the
   // provider.

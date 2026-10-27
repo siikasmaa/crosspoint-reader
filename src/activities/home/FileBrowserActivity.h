@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "activities/UiListActivity.h"
+#include "components/ListCoverThumbs.h"
 #include "components/OptionPopup.h"
 
 class FileBrowserActivity final : public UiListActivity {
@@ -41,6 +42,17 @@ class FileBrowserActivity final : public UiListActivity {
   char rowNameBuf[ROW_NAME_BUF_SIZE]{};
   char rowExtBuf[16]{};
   static void provideRow(void* ctx, uint16_t index, freeink::ui::ListItem& item);
+
+  // Cover thumbnails (Lyra): a book row whose thumbnail the Library already
+  // cached shows it scaled into the row; nothing is generated while browsing.
+  // thumbHeight is the cached file's height (the Library's row metric),
+  // thumbBoxHeight the box in this list's rows; both re-measured per build,
+  // 0 when off (other themes, firmware picker). rowPathBuf keeps its capacity
+  // across provider calls so basepath + entry costs no allocation per row.
+  int thumbHeight = 0;
+  int thumbBoxHeight = 0;
+  std::string rowPathBuf;
+  char rowThumbBuf[ListCoverThumbs::PATH_BUF_SIZE]{};
 
   // CJK fallback glyphs are prewarmed for a bounded window of rows around the
   // viewport (one SD pass per list page, like the reader TOC) instead of the

@@ -5,7 +5,7 @@
 namespace fui = freeink::ui;
 
 UiAppHost::UiAppHost(const GfxRenderer& renderer)
-    : uiTarget(makeUiTarget(renderer)), app(uiTarget, uiTarget.deviceContext()) {}
+    : uiTarget(makeUiTarget(renderer)), thumbTarget(uiTarget, renderer), app(thumbTarget, uiTarget.deviceContext()) {}
 
 void UiAppHost::resetUi() {
   uiReady = false;
