@@ -41,20 +41,27 @@ The device's HTTP client cannot validate every certificate chain, so an `http://
 
 ## Uploading firmware
 
-CI does this automatically (see `.github/workflows`). Manually:
+The `deploy-ota` job in `.github/workflows/ci.yml` does this on every push to the fork's working branch: it takes the `default` (ESP32-C3 X3/X4) build from the CI matrix, uploads it as `firmware.bin` and writes `version.json` with `<platformio.ini version>-<short sha>`, e.g. `1.6.5-abc1234`. The firmware built in the same run carries the identical `CROSSPOINT_VERSION` (via `CROSSPOINT_BUILD_SHA`), so a device that has installed that build sees no further update until the next push. Only the `default` env is served; the other boards (sticky, x4pro, x4c, papermono) are built in CI but not published here.
+
+Manually, from the repository root:
 
 ```bash
+CROSSPOINT_BUILD_SHA=$(git rev-parse HEAD) pio run -e default
+BASE=$(sed -n 's/^version[[:space:]]*=[[:space:]]*//p' platformio.ini | head -n1)
+VERSION="$BASE-$(git rev-parse --short=7 HEAD)"
+SIZE=$(stat -c%s .pio/build/default/firmware.bin)
 cd tools/ota-worker
-pio run -e gh_release -d ../..
-SIZE=$(stat -c%s ../../.pio/build/gh_release/firmware.bin)
 npx wrangler r2 object put crosspoint-firmware/firmware.bin \
-  --file=../../.pio/build/gh_release/firmware.bin --content-type=application/octet-stream
-echo "{\"version\": \"1.3.0\", \"size\": $SIZE}" > /tmp/version.json
+  --file=../../.pio/build/default/firmware.bin --content-type=application/octet-stream
+echo "{\"version\": \"$VERSION\", \"size\": $SIZE}" > /tmp/version.json
 npx wrangler r2 object put crosspoint-firmware/version.json \
   --file=/tmp/version.json --content-type=application/json
 ```
 
 ## CI configuration
+
+- `ci.yml` – builds all boards; on pushes to `customisation`/`customisation-v2` the `deploy-ota` job uploads the `default` build to R2 and redeploys the worker (GitHub environment `ota-worker`).
+- `deploy-worker.yml` – redeploys only the worker when `tools/ota-worker/**` changes, or via workflow_dispatch.
 
 The workflows read these GitHub repository **secrets**:
 
@@ -78,7 +85,7 @@ and these repository **variables**:
 
 ```json
 {
-  "tag_name": "1.3.0",
+  "tag_name": "1.6.5-abc1234",
   "assets": [
     {
       "name": "firmware.bin",
@@ -89,12 +96,12 @@ and these repository **variables**:
 }
 ```
 
-This matches the GitHub Releases API format that the device's `OtaUpdater` expects.
+This is the GitHub Releases API shape the device's `OtaUpdater` parses. Note the asset name: upstream CrossPoint (1.6+) looks for `crosspoint-<tag>-<device>.bin` in real GitHub releases, while the fork's `OtaUpdater` looks for a fixed `firmware.bin` whenever a custom OTA server URL is configured. The worker always serves exactly one asset named `firmware.bin`, so keep that name if you change either side.
 
 ## R2 bucket layout
 
 ```
 crosspoint-firmware/
-  firmware.bin    — the firmware binary
-  version.json    — {"version": "1.3.0", "size": 1234567}
+  firmware.bin    — the firmware binary (default/ESP32-C3 env)
+  version.json    — {"version": "1.6.5-abc1234", "size": 1234567}
 ```

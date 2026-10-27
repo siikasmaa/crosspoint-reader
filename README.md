@@ -268,6 +268,17 @@ For more details on the internal file structures, see the [file formats document
 
 ---
 
+## Fork customisations
+
+This fork tracks upstream CrossPoint Reader and adds a few things on top (working branch `customisation-v2`):
+
+- **Self-hosted OTA server** – a Cloudflare Worker + R2 bucket in [`tools/ota-worker`](./tools/ota-worker/README.md) serves firmware updates in the GitHub releases JSON shape. Configure it through a git-ignored `.env` in the repository root (see [`.env.example`](./.env.example)); `OTA_SERVER_URL` is baked into the firmware as the default OTA server and can still be changed on the device.
+- **Per-commit OTA builds from CI** – every push to the working branch builds all boards and publishes the `default` (ESP32-C3 X3/X4) build to the OTA server as `<version>-<short sha>`, so devices pick up each commit over the air.
+- **Cover thumbnails in Lyra list rows** – the Lyra library list shows a small cover thumbnail next to each book.
+- **Browser emulator** – [`tools/emulator`](./tools/emulator/README.md) renders EPUBs on a simulated 800x480 e-ink canvas for quick visual checks without a device.
+
+---
+
 ## Contributing
 
 Contributions are welcome. If you're new to the codebase, start with the [contributing docs](./docs/contributing/README.md). For things to work on, check the [ideas discussion board](https://github.com/crosspoint-reader/crosspoint-reader/discussions/categories/ideas) — leave a comment before starting so we don't duplicate effort.
