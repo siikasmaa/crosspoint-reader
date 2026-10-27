@@ -12,6 +12,7 @@
 
 namespace {
 size_t failNextArraySize = 0;
+size_t nothrowArrayAllocations = 0;
 }  // namespace
 
 // Keep array allocation and deletion paired, including arrays allocated by the test framework.
@@ -25,6 +26,7 @@ void* operator new[](size_t size) {
 }
 
 void* operator new[](size_t size, const std::nothrow_t&) noexcept {
+  ++nothrowArrayAllocations;
   if (failNextArraySize != 0 && size == failNextArraySize) {
     failNextArraySize = 0;
     return nullptr;
