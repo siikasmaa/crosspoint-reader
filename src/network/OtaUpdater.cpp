@@ -172,9 +172,10 @@ bool OtaUpdater::isUpdateNewer() const {
   }
 
   // Equal semver but a different full string (e.g. 1.6.5-abc1234 vs
-  // 1.6.5-def5678): treat as newer so per-commit builds from a custom OTA
-  // server install. Identical strings were rejected at the top.
-  return true;
+  // 1.6.5-def5678): per-commit builds from a custom OTA server count as
+  // newer. GitHub releases keep upstream's rule so a dev build is not
+  // offered the same release again. Identical strings were rejected above.
+  return SETTINGS.otaServerUrl[0] != '\0';
 }
 
 const std::string& OtaUpdater::getLatestVersion() const { return latestVersion; }
