@@ -926,8 +926,8 @@ void LibraryListActivity::buildRows(UiScreen& screen) {
         auto& thumbPath = winThumbs[static_cast<size_t>(rows)];
         if (ListCoverThumbs::cachedThumbPath(recentBooks[static_cast<size_t>(recent)].path, thumbHeight,
                                              thumbPath.data(), thumbPath.size())) {
-          item.icon = CoverThumbTarget::coverThumbRef(thumbPath.data(), ListCoverThumbs::slotWidth(thumbHeight),
-                                                      thumbHeight);
+          item.icon =
+              CoverThumbTarget::coverThumbRef(thumbPath.data(), ListCoverThumbs::slotWidth(thumbHeight), thumbHeight);
         }
       }
     }

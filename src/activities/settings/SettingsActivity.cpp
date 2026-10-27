@@ -348,9 +348,9 @@ void SettingsActivity::toggleCurrentSetting() {
     const std::string currentValue(strPtr);
     const std::string initialText = (isUrl && currentValue.empty()) ? "https://" : currentValue;
     // maxLength counts characters; keep one byte for the terminator.
-    auto activity = makeUniqueNoThrow<KeyboardEntryActivity>(renderer, mappedInput, I18N.get(setting.nameId),
-                                                              initialText, setting.stringMaxLen - 1,
-                                                              isUrl ? InputType::Url : InputType::Text);
+    auto activity =
+        makeUniqueNoThrow<KeyboardEntryActivity>(renderer, mappedInput, I18N.get(setting.nameId), initialText,
+                                                 setting.stringMaxLen - 1, isUrl ? InputType::Url : InputType::Text);
     if (!activity) {
       LOG_ERR("SETTINGS", "OOM: KeyboardEntryActivity");
       return;
